@@ -1,0 +1,52 @@
+name: Token Update
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "Region (e.g., bd)"
+        required: false
+        default: "bd"
+
+jobs:
+  update-tokens:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Determine JWT endpoint
+        id: endpoint
+        run: |
+          if [ -n "${{ secrets.JWT_ENDPOINT }}" ]; then
+            echo "endpoint=${{ secrets.JWT_ENDPOINT }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ vars.VERCEL_URL }}" ]; then
+            echo "endpoint=https://${{ vars.VERCEL_URL }}/jwt/cloudgen_jwt?bypass_cache=true" >> $GITHUB_OUTPUT
+          else
+            echo "JWT endpoint not configured" >&2
+            exit 1
+          fi
+
+      - name: Run updater
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          JWT_ENDPOINT: ${{ steps.endpoint.outputs.endpoint }}
+          REGION: ${{ github.event.inputs.region || 'bd' }}
+        run: |
+          python "spam friend/update_tokens.py"
+
