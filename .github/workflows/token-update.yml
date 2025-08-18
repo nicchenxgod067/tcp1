@@ -34,11 +34,8 @@ jobs:
         run: |
           if [ -n "${{ secrets.JWT_ENDPOINT }}" ]; then
             echo "endpoint=${{ secrets.JWT_ENDPOINT }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ vars.VERCEL_URL }}" ]; then
-            echo "endpoint=https://${{ vars.VERCEL_URL }}/jwt/cloudgen_jwt?bypass_cache=true" >> $GITHUB_OUTPUT
           else
-            echo "JWT endpoint not configured" >&2
-            exit 1
+            echo "endpoint=https://tcp1-two.vercel.app/jwt/cloudgen_jwt?bypass_cache=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Run updater
