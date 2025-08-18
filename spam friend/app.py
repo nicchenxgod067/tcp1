@@ -16,16 +16,16 @@ import binascii
 app = Flask(__name__)
 
 # Function to load tokens from external API
-def load_tokens():
+def load_tokens(region: str = "bd"):
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        token_path = os.path.join(base_dir, "token_bd.json")
+        token_path = os.path.join(base_dir, f"token_{region}.json")
         with open(token_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             tokens = [item["token"] for item in data]
             return tokens
     except Exception as e:
-        print(f"Error loading tokens from token_bd.json: {e}")
+        print(f"Error loading tokens from token_{region}.json: {e}")
         return []
 
 # Encryption functions for player info
@@ -121,13 +121,14 @@ def send_friend_request(uid, token, results):
 @app.route("/send_requests", methods=["GET"])
 def send_requests():
     uid = request.args.get("uid")
+    region = (request.args.get("region") or "bd").lower()
     
     if not uid:
         return jsonify({"error": "uid parameter is required"}), 400
 
-    tokens = load_tokens()
+    tokens = load_tokens(region)
     if not tokens:
-        return jsonify({"error": "No tokens found from API"}), 500
+        return jsonify({"error": f"No tokens found for region '{region}'"}), 500
 
     # Get player name (using first token)
     player_name = asyncio.run(get_player_info(uid, tokens[0]))
