@@ -8,6 +8,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # Fallback to provided values if repo secrets are not set
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || 'TyRdIGsJmwfIO3ApzthTB2NS' }}
+      # Do NOT default org id to avoid wrong scope for personal accounts
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_PROJECT_NAME: tcp1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,14 +29,67 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Resolve/Create Vercel Project ID
+        id: vercel
+        env:
+          TOKEN: ${{ env.VERCEL_TOKEN }}
+          ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          PROJECT_NAME: ${{ env.VERCEL_PROJECT_NAME }}
+          EXISTING_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+        run: |
+          set -e
+          if [ -n "$EXISTING_PROJECT_ID" ]; then
+            echo "project_id=$EXISTING_PROJECT_ID" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # Try GET without team scope first (personal account case)
+          GET_CODE=$(curl -s -o resp.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "https://api.vercel.com/v9/projects/$PROJECT_NAME")
+          if [ "$GET_CODE" = "200" ]; then
+            PID=$(jq -r '.id' resp.json)
+            echo "Found existing project (personal scope): $PID"
+            echo "project_id=$PID" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # If org/team id is provided, try team scope
+          if [ -n "$ORG_ID" ]; then
+            GET_TEAM_CODE=$(curl -s -o team.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "https://api.vercel.com/v9/projects/$PROJECT_NAME?teamId=$ORG_ID")
+            if [ "$GET_TEAM_CODE" = "200" ]; then
+              PID=$(jq -r '.id' team.json)
+              echo "Found existing project (team scope): $PID"
+              echo "project_id=$PID" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "Project not found, creating..."
+          if [ -n "$ORG_ID" ]; then
+            CREATE_CODE=$(curl -s -o create.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              -d "{\"name\": \"$PROJECT_NAME\"}" \
+              "https://api.vercel.com/v9/projects?teamId=$ORG_ID")
+          else
+            CREATE_CODE=$(curl -s -o create.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              -d "{\"name\": \"$PROJECT_NAME\"}" \
+              "https://api.vercel.com/v9/projects")
+          fi
+          if [ "$CREATE_CODE" != "200" ] && [ "$CREATE_CODE" != "201" ]; then
+            echo "Failed to create project (HTTP $CREATE_CODE)" >&2
+            cat create.json >&2 || true
+            exit 1
+          fi
+          PID=$(jq -r '.id' create.json)
+          echo "Created project id: $PID"
+          echo "project_id=$PID" >> $GITHUB_OUTPUT
+
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-token: ${{ env.VERCEL_TOKEN }}
+          vercel-org-id: ${{ env.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ steps.vercel.outputs.project_id }}
           working-directory: .
           vercel-args: "--prod"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
