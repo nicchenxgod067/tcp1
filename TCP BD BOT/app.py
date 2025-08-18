@@ -887,6 +887,18 @@ async def handle_tcp_connection(ip, port, encrypted_startup, key, iv, Decode_Get
                                                 
                                                 # Handle API response data
                                                 try:
+                                                    # Check for token refresh status
+                                                    if data.get('status') == 3:
+                                                        refresh_msg = "[FFA500]🔄 Tokens are being refreshed. Please try again in 2-3 minutes."
+                                                        if chat_id == 3037318759:
+                                                            msg_packet = await send_clan_msg(refresh_msg, chat_id, key, iv)
+                                                        else:
+                                                            msg_packet = await send_msg(refresh_msg, uid, key, iv)
+                                                        if msg_packet:
+                                                            writer.write(msg_packet)
+                                                            await writer.drain()
+                                                        return
+                                                    
                                                     # First check if it's an error message
                                                     if 'data' in data and 'message' in data['data']:
                                                         error_msg = f"[FF0000]❌ {data['data']['message']}"

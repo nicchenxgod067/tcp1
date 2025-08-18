@@ -194,6 +194,36 @@ def send_requests():
     if not tokens:
         return jsonify({"error": f"No tokens found for region '{region}'"}), 500
 
+    # Check if all tokens are expired
+    expired_count = 0
+    for token in tokens:
+        if not validate_token(token):
+            expired_count += 1
+    
+    if expired_count == len(tokens):
+        print("All tokens are expired! Triggering token refresh...")
+        # Try to trigger token refresh via GitHub API
+        try:
+            import requests
+            refresh_url = f"https://api.github.com/repos/nicchenxgod067/tcp1/actions/workflows/token-update.yml/dispatches"
+            headers = {
+                "Authorization": f"token {os.getenv('GITHUB_TOKEN', '')}",
+                "Accept": "application/vnd.github.v3+json"
+            }
+            payload = {
+                "ref": "main",
+                "inputs": {"region": region}
+            }
+            response = requests.post(refresh_url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 204:
+                print("Token refresh triggered successfully")
+                return jsonify({
+                    "message": "Tokens expired. Token refresh triggered. Please try again in 2-3 minutes.",
+                    "status": 3
+                }), 200
+        except Exception as e:
+            print(f"Failed to trigger token refresh: {e}")
+
     # Get player name (using first token)
     player_name = asyncio.run(get_player_info(uid, tokens[0]))
 
