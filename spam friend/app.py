@@ -140,12 +140,14 @@ def send_friend_request(uid, token, results):
         encrypted_id = Encrypt_ID(uid)
         if not encrypted_id:
             results["failed"] += 1
+            print(f"Failed to encrypt UID {uid}")
             return
             
         payload = f"08a7c4839f1e10{encrypted_id}1801"
         encrypted_payload = encrypt_api(payload)
         if not encrypted_payload:
             results["failed"] += 1
+            print(f"Failed to encrypt payload for UID {uid}")
             return
 
         url = "https://clientbp.ggblueshark.com/RequestAddingFriend"
@@ -167,20 +169,30 @@ def send_friend_request(uid, token, results):
 
         if response.status_code == 200:
             results["success"] += 1
+            print(f"✅ Success: Friend request sent to UID {uid}")
         elif response.status_code == 401:
             # Token expired or invalid
             results["failed"] += 1
-            print(f"Token expired/invalid: HTTP 401 for UID {uid}")
+            print(f"❌ Token expired/invalid: HTTP 401 for UID {uid}")
             # Add to expired tokens list for cleanup
             if "expired_tokens" not in results:
                 results["expired_tokens"] = []
             results["expired_tokens"].append(token)
+        elif response.status_code == 400:
+            results["failed"] += 1
+            print(f"❌ Bad request: HTTP 400 for UID {uid} - {response.text[:200]}")
+        elif response.status_code == 404:
+            results["failed"] += 1
+            print(f"❌ User not found: HTTP 404 for UID {uid}")
+        elif response.status_code == 403:
+            results["failed"] += 1
+            print(f"❌ Forbidden: HTTP 403 for UID {uid} - {response.text[:200]}")
         else:
             results["failed"] += 1
-            print(f"Friend request failed: HTTP {response.status_code} for UID {uid} - {response.text[:100]}")
+            print(f"❌ Friend request failed: HTTP {response.status_code} for UID {uid} - {response.text[:200]}")
     except Exception as e:
         results["failed"] += 1
-        print(f"Exception in friend request for UID {uid}: {e}")
+        print(f"❌ Exception in friend request for UID {uid}: {e}")
 
 @app.route("/send_requests", methods=["GET"])
 def send_requests():
@@ -262,7 +274,7 @@ def test_token():
     
     # Test first token
     test_token = tokens[0]
-    test_uid = "13038762931"  # Your target UID
+    test_uid = request.args.get("uid", "13038762931")  # Allow custom UID
     
     try:
         encrypted_id = Encrypt_ID(test_uid)
