@@ -92,31 +92,43 @@ async def get_player_info(uid, token):
         return None
 
 def send_friend_request(uid, token, results):
-    encrypted_id = Encrypt_ID(uid)
-    payload = f"08a7c4839f1e10{encrypted_id}1801"
-    encrypted_payload = encrypt_api(payload)
+    try:
+        encrypted_id = Encrypt_ID(uid)
+        if not encrypted_id:
+            results["failed"] += 1
+            return
+            
+        payload = f"08a7c4839f1e10{encrypted_id}1801"
+        encrypted_payload = encrypt_api(payload)
+        if not encrypted_payload:
+            results["failed"] += 1
+            return
 
-    url = "https://clientbp.ggblueshark.com/RequestAddingFriend"
-    headers = {
-        "Expect": "100-continue",
-        "Authorization": f"Bearer {token}",
-        "X-Unity-Version": "2018.4.11f1",
-        "X-GA": "v1 1",
-        "ReleaseVersion": "OB50",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Content-Length": "16",
-        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; SM-N975F Build/PI)",
-        "Host": "clientbp.ggblueshark.com",
-        "Connection": "close",
-        "Accept-Encoding": "gzip, deflate, br"
-    }
+        url = "https://clientbp.ggblueshark.com/RequestAddingFriend"
+        headers = {
+            "Expect": "100-continue",
+            "Authorization": f"Bearer {token}",
+            "X-Unity-Version": "2018.4.11f1",
+            "X-GA": "v1 1",
+            "ReleaseVersion": "OB50",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": "16",
+            "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; SM-N975F Build/PI)",
+            "Host": "clientbp.ggblueshark.com",
+            "Connection": "close",
+            "Accept-Encoding": "gzip, deflate, br"
+        }
 
-    response = requests.post(url, headers=headers, data=bytes.fromhex(encrypted_payload))
+        response = requests.post(url, headers=headers, data=bytes.fromhex(encrypted_payload), timeout=10)
 
-    if response.status_code == 200:
-        results["success"] += 1
-    else:
+        if response.status_code == 200:
+            results["success"] += 1
+        else:
+            results["failed"] += 1
+            print(f"Friend request failed: HTTP {response.status_code} for UID {uid}")
+    except Exception as e:
         results["failed"] += 1
+        print(f"Exception in friend request for UID {uid}: {e}")
 
 @app.route("/send_requests", methods=["GET"])
 def send_requests():
