@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "public": true,
   "builds": [
     {
       "src": "app.py",
@@ -35,6 +36,9 @@
     "app.py": {
       "maxDuration": 30
     }
+  },
+  "env": {
+    "VERCEL_PUBLIC": "true"
   }
 }
 
