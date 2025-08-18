@@ -1,8 +1,9 @@
 import os
 import sys
 import importlib.util
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from flask_cors import CORS
 
 
 def _load_flask_subapp(module_path: str, module_name: str):
@@ -28,6 +29,7 @@ spam_app = _load_flask_subapp(os.path.join("spam friend", "app.py"), "spam_frien
 
 
 base = Flask(__name__)
+CORS(base, origins="*", methods=["GET", "POST", "OPTIONS"])
 
 
 @base.get("/")
@@ -41,6 +43,18 @@ def root_index():
         }
     })
 
+
+@base.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+
+# Add CORS to sub-apps
+CORS(jwt_app, origins="*", methods=["GET", "POST", "OPTIONS"])
+CORS(spam_app, origins="*", methods=["GET", "POST", "OPTIONS"])
 
 # Mount both apps under prefixes
 app = DispatcherMiddleware(base, {

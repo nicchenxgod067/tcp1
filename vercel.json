@@ -9,9 +9,32 @@
   ],
   "routes": [
     {
+      "src": "/spam/(.*)",
+      "dest": "/app.py",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
+      "src": "/jwt/(.*)",
+      "dest": "/app.py",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "/app.py"
     }
-  ]
+  ],
+  "functions": {
+    "app.py": {
+      "maxDuration": 30
+    }
+  }
 }
 
