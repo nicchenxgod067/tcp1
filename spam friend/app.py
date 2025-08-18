@@ -16,6 +16,42 @@ import binascii
 app = Flask(__name__)
 
 # Function to load tokens from external API
+def validate_token(token):
+    """Quick validation to check if token format is valid"""
+    try:
+        # Basic JWT format check
+        if not token or len(token.split('.')) != 3:
+            return False
+        
+        # Check if token is not too old (basic check)
+        import base64
+        import time
+        
+        parts = token.split('.')
+        if len(parts) != 3:
+            return False
+            
+        # Decode payload
+        payload = parts[1]
+        # Add padding if needed
+        payload += '=' * (4 - len(payload) % 4)
+        
+        try:
+            decoded = base64.b64decode(payload).decode('utf-8')
+            payload_data = json.loads(decoded)
+            
+            # Check expiration
+            if 'exp' in payload_data:
+                current_time = int(time.time())
+                if payload_data['exp'] < current_time:
+                    return False
+                    
+            return True
+        except:
+            return False
+    except:
+        return False
+
 def load_tokens(region: str = "bd"):
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +59,15 @@ def load_tokens(region: str = "bd"):
         with open(token_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             tokens = [item["token"] for item in data]
-            return tokens
+            
+            # Filter out invalid tokens
+            valid_tokens = [token for token in tokens if validate_token(token)]
+            invalid_count = len(tokens) - len(valid_tokens)
+            
+            if invalid_count > 0:
+                print(f"Filtered out {invalid_count} invalid/expired tokens")
+                
+            return valid_tokens
     except Exception as e:
         print(f"Error loading tokens from token_{region}.json: {e}")
         return []
@@ -123,9 +167,17 @@ def send_friend_request(uid, token, results):
 
         if response.status_code == 200:
             results["success"] += 1
+        elif response.status_code == 401:
+            # Token expired or invalid
+            results["failed"] += 1
+            print(f"Token expired/invalid: HTTP 401 for UID {uid}")
+            # Add to expired tokens list for cleanup
+            if "expired_tokens" not in results:
+                results["expired_tokens"] = []
+            results["expired_tokens"].append(token)
         else:
             results["failed"] += 1
-            print(f"Friend request failed: HTTP {response.status_code} for UID {uid}")
+            print(f"Friend request failed: HTTP {response.status_code} for UID {uid} - {response.text[:100]}")
     except Exception as e:
         results["failed"] += 1
         print(f"Exception in friend request for UID {uid}: {e}")
