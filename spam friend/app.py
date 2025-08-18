@@ -170,5 +170,55 @@ def send_requests():
 
     return jsonify(response_data)
 
+@app.route("/test_token", methods=["GET"])
+def test_token():
+    """Test a single token to see if it works"""
+    region = (request.args.get("region") or "bd").lower()
+    tokens = load_tokens(region)
+    if not tokens:
+        return jsonify({"error": f"No tokens found for region '{region}'"}), 500
+    
+    # Test first token
+    test_token = tokens[0]
+    test_uid = "13038762931"  # Your target UID
+    
+    try:
+        encrypted_id = Encrypt_ID(test_uid)
+        if not encrypted_id:
+            return jsonify({"error": "Failed to encrypt UID"}), 500
+            
+        payload = f"08a7c4839f1e10{encrypted_id}1801"
+        encrypted_payload = encrypt_api(payload)
+        if not encrypted_payload:
+            return jsonify({"error": "Failed to encrypt payload"}), 500
+
+        url = "https://clientbp.ggblueshark.com/RequestAddingFriend"
+        headers = {
+            "Expect": "100-continue",
+            "Authorization": f"Bearer {test_token}",
+            "X-Unity-Version": "2018.4.11f1",
+            "X-GA": "v1 1",
+            "ReleaseVersion": "OB50",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": "16",
+            "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; SM-N975F Build/PI)",
+            "Host": "clientbp.ggblueshark.com",
+            "Connection": "close",
+            "Accept-Encoding": "gzip, deflate, br"
+        }
+
+        response = requests.post(url, headers=headers, data=bytes.fromhex(encrypted_payload), timeout=10)
+        
+        return jsonify({
+            "status_code": response.status_code,
+            "response_text": response.text[:200] if response.text else "No response text",
+            "headers": dict(response.headers),
+            "encrypted_uid": encrypted_id,
+            "encrypted_payload": encrypted_payload
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
