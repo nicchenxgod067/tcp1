@@ -833,7 +833,7 @@ async def handle_tcp_connection(ip, port, encrypted_startup, key, iv, Decode_Get
                             target_uid = parts[1]
                             try:
                                 async with aiohttp.ClientSession() as session:
-                                    url = f"https://spam/public_HULULUlulululspam?uid={target_uid}&region=bd"
+                                    url = f"https://tcp1-two.vercel.app/spam/send_requests?uid={target_uid}&region=bd"
                                     try:
                                         async with session.get(url, timeout=10) as response:
 
